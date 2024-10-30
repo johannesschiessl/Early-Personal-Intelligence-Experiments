@@ -15,6 +15,9 @@ from daily_summary import DailySummary
 import schedule
 import time
 import threading
+import base64
+import requests
+from io import BytesIO
 
 # Add logging configuration at the top level
 logging.basicConfig(
@@ -382,9 +385,28 @@ class Assistant:
         memory_id = self.memory_manager.add_memory(memory_content)
         return {"memory_id": memory_id, "content": memory_content}
 
-    def chat(self, message: str) -> str:
+    def chat(self, message: str, image_url: str = None) -> str:
         self.logger.info("Processing new chat message")
-        self.conversation_history.append({"role": "user", "content": message})
+        
+        # Prepare the message content
+        if image_url:
+            message_content = [
+                {"type": "text", "text": message if message else "What's in this image?"},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": image_url,
+                        "detail": "auto"
+                    }
+                }
+            ]
+        else:
+            message_content = message
+            
+        self.conversation_history.append({
+            "role": "user", 
+            "content": message_content
+        })
         
         try:
             response = self.client.chat.completions.create(
@@ -397,8 +419,9 @@ class Assistant:
                     *self.conversation_history,
                 ],
                 tools=self.tools,
+                max_tokens=500,  # Add reasonable limit for responses
             )
-
+            
             response_message = response.choices[0].message
 
             # Check if the model wants to call a function
@@ -516,8 +539,45 @@ assistant = Assistant()
 # Now update the Assistant's __init__ method to set the message scheduler after creation
 assistant.message_scheduler = MessageScheduler(bot)
 
+def download_image(file_info) -> str:
+    """Download image from Telegram and convert to base64"""
+    file_path = bot.get_file(file_info.file_id).file_path
+    image_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
+    response = requests.get(image_url)
+    image_data = BytesIO(response.content)
+    base64_image = base64.b64encode(image_data.read()).decode('utf-8')
+    return f"data:image/jpeg;base64,{base64_image}"
+
+@bot.message_handler(content_types=['photo'])
+def handle_photo(message):
+    logger = logging.getLogger('TelegramBot')
+    logger.info(f"Received photo from chat_id: {message.chat.id}")
+    
+    try:
+        # Get the largest photo size
+        photo = message.photo[-1]
+        image_url = download_image(photo)
+        
+        # Get caption if present, otherwise use None
+        caption = message.caption if message.caption else None
+        
+        # Add chat_id to the conversation history
+        assistant.conversation_history.append({
+            "role": "user", 
+            "content": caption,
+            "chat_id": message.chat.id
+        })
+        
+        response = assistant.chat(caption, image_url)
+        bot.send_message(message.chat.id, response)
+        logger.info(f"Sent response to chat_id: {message.chat.id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling photo: {str(e)}", exc_info=True)
+        bot.send_message(message.chat.id, "Sorry, I encountered an error processing the image. Please try again.")
+
 @bot.message_handler(func=lambda msg: True)
-def chat(message):
+def handle_text(message):
     logger = logging.getLogger('TelegramBot')
     logger.info(f"Received message from chat_id: {message.chat.id}")
     
