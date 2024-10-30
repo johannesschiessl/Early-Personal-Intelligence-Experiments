@@ -1,7 +1,7 @@
 import json
 import os
 from typing import Dict, List
-import uuid
+from datetime import datetime
 
 class MemoryManager:
     def __init__(self, file_path: str = "memories.json"):
@@ -18,13 +18,43 @@ class MemoryManager:
         with open(self.file_path, 'w') as f:
             json.dump(self.memories, f, indent=2)
 
-    def add_memory(self, content: str) -> str:
-        memory_id = str(uuid.uuid4())
-        self.memories[memory_id] = content
+    def add_memory(self, memory_id: str, content: str) -> Dict:
+        """
+        Add a new memory with a custom ID and timestamp
+        
+        Args:
+            memory_id: Custom identifier for the memory (e.g. 'john_likes_coffee')
+            content: The content of the memory
+            
+        Returns:
+            Dict containing the memory details
+        """
+        if memory_id in self.memories:
+            return {"error": f"Memory with ID {memory_id} already exists"}
+            
+        timestamp = datetime.now().isoformat()
+        memory_data = {
+            "content": content,
+            "timestamp": timestamp
+        }
+        
+        self.memories[memory_id] = memory_data
         self._save_memories()
-        return memory_id
+        
+        return {
+            "id": memory_id,
+            "content": content,
+            "timestamp": timestamp
+        }
 
     def get_all_memories(self) -> str:
+        """Get all memories formatted as a string"""
         if not self.memories:
             return "No memories stored."
-        return "\n".join([f"{k}: {v}" for k, v in self.memories.items()])
+        
+        memory_strings = []
+        for memory_id, memory_data in self.memories.items():
+            memory_strings.append(
+                f"{memory_id}: {memory_data['content']} (Added: {memory_data['timestamp']})"
+            )
+        return "\n".join(memory_strings)

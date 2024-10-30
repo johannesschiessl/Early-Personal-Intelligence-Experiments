@@ -123,7 +123,25 @@ class Assistant:
         You chat with the user via telegram. So your response should be concise and to the point. If needed you can give more detailed answers.
         NEVER use markdown formatting in your responses. You will be fired if you do.
         
-        You can store new memories using the store_memory function. Remember things about the user and context.
+        Memory Management:
+        You should actively remember and store important information about users using the memory functions:
+        
+        1. store_memory: Use this to save new information about the user
+           - Create meaningful memory_ids like "user_coffee_preference" or "user_birthday"
+           - Example: store_memory("user_coffee_preference", "Likes black coffee with no sugar")
+        
+        Important things to remember about users:
+        - Personal preferences (food, drinks, activities)
+        - Important dates (birthday, anniversaries)
+        - Family members and relationships
+        - Work/study information
+        - Hobbies and interests
+        - Past conversations and context
+        - Regular schedules or routines
+        - Pet peeves or dislikes
+        - Goals and aspirations
+        
+        Actively use these memories in conversations to provide personalized responses and show that you remember previous interactions.
         
         You can manage files in the data directory using the file function:
         - To read a file: Use mode="r" and provide the path
@@ -189,12 +207,16 @@ class Assistant:
                 "parameters": {
                     "type": "object",
                     "properties": {
+                        "memory_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the memory (e.g. 'john_likes_coffee')"
+                        },
                         "memory_content": {
                             "type": "string",
                             "description": "The content to store as a memory"
                         }
                     },
-                    "required": ["memory_content"]
+                    "required": ["memory_id", "memory_content"]
                 }
             }
         },
@@ -380,10 +402,9 @@ class Assistant:
             }
         }]
 
-    def store_memory(self, memory_content: str) -> Dict:
-        """Store a new memory and return its ID"""
-        memory_id = self.memory_manager.add_memory(memory_content)
-        return {"memory_id": memory_id, "content": memory_content}
+    def store_memory(self, memory_id: str, memory_content: str) -> Dict:
+        """Store a new memory and return its details"""
+        return self.memory_manager.add_memory(memory_id, memory_content)
 
     def chat(self, message: str, image_url: str = None) -> str:
         self.logger.info("Processing new chat message")
@@ -419,7 +440,7 @@ class Assistant:
                     *self.conversation_history,
                 ],
                 tools=self.tools,
-                max_tokens=500,  # Add reasonable limit for responses
+                max_tokens=500,
             )
             
             response_message = response.choices[0].message
