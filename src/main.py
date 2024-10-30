@@ -11,6 +11,10 @@ from url_handler import URLHandler
 from datetime import datetime
 from message_scheduler import MessageScheduler
 from calendar_handler import CalendarHandler
+from daily_summary import DailySummary
+import schedule
+import time
+import threading
 
 # Add logging configuration at the top level
 logging.basicConfig(
@@ -62,6 +66,7 @@ class Assistant:
         self.logger.info("Assistant initialization complete")
 
         self.calendar_handler = CalendarHandler()
+        self.daily_summary = DailySummary(self)
 
     def handle_file(self, path: str, content: str = None, mode: str = "r") -> Dict:
         """Handle file operations in the data directory"""
@@ -466,6 +471,41 @@ class Assistant:
         """Delete an event from Google Calendar"""
         return self.calendar_handler.delete_event(event_id)
 
+    def send_daily_summary(self, chat_id: int, is_morning: bool = True):
+        """Send a daily summary to the specified chat"""
+        try:
+            summary = self.daily_summary.generate_summary(chat_id, is_morning)
+            bot.send_message(chat_id, summary)
+            self.logger.info(f"Sent {'morning' if is_morning else 'evening'} summary to chat_id: {chat_id}")
+        except Exception as e:
+            self.logger.error(f"Error sending daily summary: {str(e)}", exc_info=True)
+
+    def schedule_daily_summaries(self):
+        """Schedule daily summaries for all active chats"""
+        def run_schedule():
+            while True:
+                schedule.run_pending()
+                time.sleep(60)
+
+        try:
+            # Read active chats from file
+            with open('active_chats.txt', 'r') as f:
+                active_chats = [int(line.strip()) for line in f if line.strip()]
+
+            # Schedule summaries for each active chat
+            for chat_id in active_chats:
+                schedule.every().day.at("06:30").do(
+                    self.send_daily_summary, chat_id, True)
+                schedule.every().day.at("19:30").do(
+                    self.send_daily_summary, chat_id, False)
+
+            # Run the schedule in a separate thread
+            schedule_thread = threading.Thread(target=run_schedule, daemon=True)
+            schedule_thread.start()
+            self.logger.info("Daily summaries scheduled successfully")
+        except Exception as e:
+            self.logger.error(f"Error scheduling daily summaries: {str(e)}", exc_info=True)
+
 # Initialize the Telegram bot first
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -499,6 +539,11 @@ def chat(message):
 def main():
     logger = logging.getLogger('Main')
     logger.info("Starting bot...")
+    
+    # Schedule daily summaries before starting the bot
+    assistant.schedule_daily_summaries()
+    
+    # Start the bot
     bot.infinity_polling()
 
 if __name__ == "__main__":

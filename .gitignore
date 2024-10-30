@@ -165,6 +165,7 @@ cython_debug/
 /data
 memories.json
 scheduled_messages.json
+active_chats.txt
 
 # Google Calendar
 token.pickle
