@@ -57,6 +57,52 @@ class CalendarHandler:
             self.logger.error(f"Error adding calendar event: {str(e)}", exc_info=True)
             return {'success': False, 'error': str(e)}
 
+    def edit_event(self, event_id, summary=None, start_time=None, end_time=None, description=None):
+        """Edit an existing event in Google Calendar"""
+        try:
+            # First get the existing event
+            event = self.service.events().get(calendarId='primary', eventId=event_id).execute()
+            
+            # Update the fields that were provided
+            if summary:
+                event['summary'] = summary
+            if description:
+                event['description'] = description
+            if start_time:
+                event['start']['dateTime'] = start_time
+            if end_time:
+                event['end']['dateTime'] = end_time
+            elif start_time and not end_time:
+                # If only start_time was updated, adjust end_time to be 1 hour later
+                event['end']['dateTime'] = (datetime.fromisoformat(start_time) + timedelta(hours=1)).isoformat()
+
+            updated_event = self.service.events().update(
+                calendarId='primary',
+                eventId=event_id,
+                body=event
+            ).execute()
+
+            return {
+                'success': True,
+                'event_id': updated_event['id'],
+                'link': updated_event['htmlLink']
+            }
+        except Exception as e:
+            self.logger.error(f"Error editing calendar event: {str(e)}", exc_info=True)
+            return {'success': False, 'error': str(e)}
+
+    def delete_event(self, event_id):
+        """Delete an event from Google Calendar"""
+        try:
+            self.service.events().delete(calendarId='primary', eventId=event_id).execute()
+            return {
+                'success': True,
+                'message': f'Event {event_id} successfully deleted'
+            }
+        except Exception as e:
+            self.logger.error(f"Error deleting calendar event: {str(e)}", exc_info=True)
+            return {'success': False, 'error': str(e)}
+
     def list_events(self, max_results=10):
         """List upcoming events from Google Calendar"""
         try:

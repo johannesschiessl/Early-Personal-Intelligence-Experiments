@@ -53,6 +53,8 @@ class Assistant:
             "schedule_message": self.schedule_message,
             "add_calendar_event": self.add_calendar_event,
             "list_calendar_events": self.list_calendar_events,
+            "edit_calendar_event": self.edit_calendar_event,
+            "delete_calendar_event": self.delete_calendar_event,
         }
         
         # message_scheduler will be set after initialization
@@ -146,6 +148,12 @@ class Assistant:
           - Required: summary (title) and start_time (YYYY-MM-DDTHH:MM:SS)
           - Optional: end_time and description
           - If no end_time is provided, events default to 1 hour duration
+        - Edit events using edit_calendar_event:
+          - Required: event_id
+          - Optional: summary, start_time, end_time, description
+          - Only provided fields will be updated
+        - Delete events using delete_calendar_event:
+          - Required: event_id
         - List upcoming events using list_calendar_events:
           - Optional: max_results (default 10)
           - Returns upcoming events sorted by start time
@@ -312,6 +320,56 @@ class Assistant:
                     }
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "edit_calendar_event",
+                "description": "Edit an existing event in Google Calendar",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "event_id": {
+                            "type": "string",
+                            "description": "ID of the event to edit"
+                        },
+                        "summary": {
+                            "type": "string",
+                            "description": "New title of the event (optional)"
+                        },
+                        "start_time": {
+                            "type": "string",
+                            "description": "New start time in ISO format (YYYY-MM-DDTHH:MM:SS) (optional)"
+                        },
+                        "end_time": {
+                            "type": "string",
+                            "description": "New end time in ISO format (YYYY-MM-DDTHH:MM:SS) (optional)"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "New description of the event (optional)"
+                        }
+                    },
+                    "required": ["event_id"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "delete_calendar_event",
+                "description": "Delete an event from Google Calendar",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "event_id": {
+                            "type": "string",
+                            "description": "ID of the event to delete"
+                        }
+                    },
+                    "required": ["event_id"]
+                }
+            }
         }]
 
     def store_memory(self, memory_content: str) -> Dict:
@@ -398,6 +456,15 @@ class Assistant:
     def list_calendar_events(self, max_results: int = 10) -> Dict:
         """List upcoming events from Google Calendar"""
         return self.calendar_handler.list_events(max_results)
+
+    def edit_calendar_event(self, event_id: str, summary: str = None, start_time: str = None, 
+                           end_time: str = None, description: str = None) -> Dict:
+        """Edit an existing event in Google Calendar"""
+        return self.calendar_handler.edit_event(event_id, summary, start_time, end_time, description)
+
+    def delete_calendar_event(self, event_id: str) -> Dict:
+        """Delete an event from Google Calendar"""
+        return self.calendar_handler.delete_event(event_id)
 
 # Initialize the Telegram bot first
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
