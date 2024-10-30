@@ -165,3 +165,7 @@ cython_debug/
 /data
 memories.json
 scheduled_messages.json
+
+# Google Calendar
+token.pickle
+credentials.json

@@ -10,6 +10,7 @@ from code_executor import CodeExecutor
 from url_handler import URLHandler
 from datetime import datetime
 from message_scheduler import MessageScheduler
+from calendar_handler import CalendarHandler
 
 # Add logging configuration at the top level
 logging.basicConfig(
@@ -50,11 +51,15 @@ class Assistant:
             "execute_code": self.code_executor.execute_code,
             "open_url": self.url_handler.open_url,
             "schedule_message": self.schedule_message,
+            "add_calendar_event": self.add_calendar_event,
+            "list_calendar_events": self.list_calendar_events,
         }
         
         # message_scheduler will be set after initialization
         self.message_scheduler = None
         self.logger.info("Assistant initialization complete")
+
+        self.calendar_handler = CalendarHandler()
 
     def handle_file(self, path: str, content: str = None, mode: str = "r") -> Dict:
         """Handle file operations in the data directory"""
@@ -135,6 +140,16 @@ class Assistant:
         - The time must be in the format: YYYY-MM-DD HH:MM:SS
         - Messages cannot be scheduled in the past
         - Use this to set reminders or schedule announcements
+
+        You can manage the user's Google Calendar:
+        - Add events using add_calendar_event:
+          - Required: summary (title) and start_time (YYYY-MM-DDTHH:MM:SS)
+          - Optional: end_time and description
+          - If no end_time is provided, events default to 1 hour duration
+        - List upcoming events using list_calendar_events:
+          - Optional: max_results (default 10)
+          - Returns upcoming events sorted by start time
+        - Use these to help manage the user's schedule and appointments
         
         Paths are relative to the data directory, starting with /
         When writing files, always provide the complete content - do not use placeholders
@@ -252,6 +267,51 @@ class Assistant:
                     "required": ["message", "scheduled_time"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "add_calendar_event",
+                "description": "Add an event to Google Calendar",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "summary": {
+                            "type": "string",
+                            "description": "Title of the event"
+                        },
+                        "start_time": {
+                            "type": "string",
+                            "description": "Start time in ISO format (YYYY-MM-DDTHH:MM:SS)"
+                        },
+                        "end_time": {
+                            "type": "string",
+                            "description": "End time in ISO format (YYYY-MM-DDTHH:MM:SS). Optional, defaults to 1 hour after start"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Description of the event. Optional"
+                        }
+                    },
+                    "required": ["summary", "start_time"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "list_calendar_events",
+                "description": "List upcoming events from Google Calendar",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "max_results": {
+                            "type": "integer",
+                            "description": "Maximum number of events to return (default: 10)"
+                        }
+                    }
+                }
+            }
         }]
 
     def store_memory(self, memory_content: str) -> Dict:
@@ -330,6 +390,14 @@ class Assistant:
             return {"error": "No chat ID found in conversation history"}
             
         return self.message_scheduler.schedule_message(chat_id, message, scheduled_time)
+
+    def add_calendar_event(self, summary: str, start_time: str, end_time: str = None, description: str = None) -> Dict:
+        """Add an event to Google Calendar"""
+        return self.calendar_handler.add_event(summary, start_time, end_time, description)
+
+    def list_calendar_events(self, max_results: int = 10) -> Dict:
+        """List upcoming events from Google Calendar"""
+        return self.calendar_handler.list_events(max_results)
 
 # Initialize the Telegram bot first
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
