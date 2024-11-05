@@ -4,6 +4,7 @@ from utils.conversations import Conversations
 from utils.read_memories import read_memories
 from tools.memories import Memory
 from tools.schedule_messages import MessageSchedule
+from tools.open_url import URLContent
 import logging
 import json
 
@@ -18,6 +19,7 @@ class Assistant:
         self.client = OpenAI()
         self.conversations = Conversations()
         self.memory = Memory()
+        self.url_content = URLContent()
         self.telegram_bot = None
         
     def set_bot(self, bot):
@@ -42,59 +44,81 @@ class Assistant:
         2. Schedule Message Tool:
            - To schedule a message: schedule_message(message='message content', scheduled_time='YYYY-MM-DD HH:MM:SS')
            The scheduled_time must be in the future and in the format: YYYY-MM-DD HH:MM:SS
+        3. Open URL Tool:
+           - To fetch and process content from a URL: open_url(url='URL')
         """
         return base_prompt
 
     def _get_tools(self) -> list:
         """Define available tools for the assistant"""
-        return [{
-            "type": "function",
-            "function": {
-                "name": "memory",
-                "description": "Store, update or delete memories",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "mode": {
-                            "type": "string",
-                            "enum": ["w", "d"],
-                            "description": "Write ('w') or delete ('d') mode"
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "memory",
+                    "description": "Store, update or delete memories",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "mode": {
+                                "type": "string",
+                                "enum": ["w", "d"],
+                                "description": "Write ('w') or delete ('d') mode"
+                            },
+                            "id": {
+                                "type": "string",
+                                "description": "Unique identifier for the memory (e.g., 'user_preferences')"
+                            },
+                            "content": {
+                                "type": "string",
+                                "description": "Content to store (required for write mode)"
+                            }
                         },
-                        "id": {
-                            "type": "string",
-                            "description": "Unique identifier for the memory (e.g., 'user_preferences')"
+                        "required": ["mode", "id"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "schedule_message",
+                    "description": "Schedule a message to be sent at a specific time",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "message": {
+                                "type": "string",
+                                "description": "Message content to be sent"
+                            },
+                            "scheduled_time": {
+                                "type": "string",
+                                "description": "Time to send the message (format: YYYY-MM-DD HH:MM:SS)"
+                            }
                         },
-                        "content": {
-                            "type": "string",
-                            "description": "Content to store (required for write mode)"
-                        }
-                    },
-                    "required": ["mode", "id"]
+                        "required": ["message", "scheduled_time"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "open_url",
+                    "description": "Fetch and process content from a URL, returning cleaned markdown",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "url": {
+                                "type": "string",
+                                "description": "The URL to fetch content from"
+                            }
+                        },
+                        "required": ["url"]
+                    }
                 }
             }
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "schedule_message",
-                "description": "Schedule a message to be sent at a specific time",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "message": {
-                            "type": "string",
-                            "description": "Message content to be sent"
-                        },
-                        "scheduled_time": {
-                            "type": "string",
-                            "description": "Time to send the message (format: YYYY-MM-DD HH:MM:SS)"
-                        }
-                    },
-                    "required": ["message", "scheduled_time"]
-                }
-            }
-        }]
-        
+        ]
+        return tools
+
     def handle_message(self, chat_id: int, message: str) -> str:
         """Process incoming messages and return AI response"""
         self.conversations.add(chat_id, "user", message)
@@ -150,6 +174,8 @@ class Assistant:
                             message=args["message"],
                             scheduled_time=args["scheduled_time"]
                         )
+                    elif tool_call.function.name == "open_url":
+                        result = self.url_content.fetch(args["url"])
                     
                     logging.info(
                         f"Chat ID {chat_id} - Tool result:\n"
