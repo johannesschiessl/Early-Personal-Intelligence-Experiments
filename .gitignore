@@ -170,3 +170,6 @@ active_chats.txt
 # Google Calendar
 token.pickle
 credentials.json
+
+# Cursor
+ai_docs/
