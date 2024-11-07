@@ -163,6 +163,9 @@ cython_debug/
 
 # Personal Intelligence
 /data
+/logs
+/ai_docs
+/ai_files
 memories.json
 scheduled_messages.json
 active_chats.txt
@@ -170,6 +173,3 @@ active_chats.txt
 # Google Calendar
 token.pickle
 credentials.json
-
-# Cursor
-ai_docs/
