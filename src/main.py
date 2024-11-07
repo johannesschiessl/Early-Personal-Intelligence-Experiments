@@ -5,6 +5,7 @@ from utils.read_memories import read_memories
 from tools.memories import Memory
 from tools.schedule_messages import MessageSchedule
 from tools.open_url import URLContent
+from agents.file_agent import FileAgent
 import logging
 import json
 
@@ -21,6 +22,7 @@ class Assistant:
         self.memory = Memory()
         self.url_content = URLContent()
         self.telegram_bot = None
+        self.file_agent = FileAgent(ai_directory="ai_files")
         
     def set_bot(self, bot):
         """Set the telegram bot instance and initialize message scheduler"""
@@ -46,6 +48,14 @@ class Assistant:
            The scheduled_time must be in the future and in the format: YYYY-MM-DD HH:MM:SS
         3. Open URL Tool:
            - To fetch and process content from a URL: open_url(url='URL')
+
+
+        # Agents
+        You can call agents and hand off tasks to them.
+
+        Available Agents:
+        1. File Agent:
+           - To read and copy files: file_agent(task='description of the file operation needed')
         """
         return base_prompt
 
@@ -119,6 +129,28 @@ class Assistant:
         ]
         return tools
 
+    def _get_agent_calls(self) -> list:
+        """Define available agent calls"""
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "file_agent",
+                    "description": "Activate the File Agent to read and copy files",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "task": {
+                                "type": "string",
+                                "description": "Description of the file operation needed"
+                            }
+                        },
+                        "required": ["task"]
+                    }
+                }
+            }
+        ]
+
     def handle_message(self, chat_id: int, message: str) -> str:
         """Process incoming messages and return AI response"""
         self.conversations.add(chat_id, "user", message)
@@ -134,10 +166,12 @@ class Assistant:
             ]
             messages.extend(self.conversations.get(chat_id))
             
+            tools = self._get_tools() + self._get_agent_calls()
+            
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=messages,
-                tools=self._get_tools(),
+                tools=tools,
                 tool_choice="auto",
                 max_tokens=500
             )
@@ -176,6 +210,8 @@ class Assistant:
                         )
                     elif tool_call.function.name == "open_url":
                         result = self.url_content.fetch(args["url"])
+                    elif tool_call.function.name == "file_agent":
+                        result = self.file_agent.process_task(args["task"])
                     
                     logging.info(
                         f"Chat ID {chat_id} - Tool result:\n"
