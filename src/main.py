@@ -1,4 +1,5 @@
 from openai import OpenAI
+from utils.datetime import get_current_datetime
 from utils.telegram import TelegramBot
 from utils.conversations import Conversations
 from utils.read_memories import read_memories
@@ -32,8 +33,10 @@ class Assistant:
     @property
     def system_prompt(self) -> str:
         """Dynamic system prompt that includes available tools and memories"""
-        base_prompt = """You are a helpful AI assistant. You aim to provide clear, 
+        base_prompt = f"""You are a helpful AI assistant. You aim to provide clear, 
         accurate, and helpful responses while maintaining a friendly and professional tone.
+
+        You chat with users on Telegram. So do not use markdown in your responses.
         
         Available Tools:
         1. Memory Tool:
@@ -42,6 +45,7 @@ class Assistant:
            
            When creating memory_ids, use descriptive names like 'user_preferences', 'learning_style', etc.
            Always include the relevant context in the memory_id.
+           Use memories frequently to remember important information. Also follow user instructions.
            
         2. Schedule Message Tool:
            - To schedule a message: schedule_message(message='message content', scheduled_time='YYYY-MM-DD HH:MM:SS')
@@ -56,6 +60,9 @@ class Assistant:
         Available Agents:
         1. File Agent:
            - To read and copy files: file_agent(task='description of the file operation needed')
+
+        # Current Context
+        Current Time and Date: {get_current_datetime()}
         """
         return base_prompt
 
@@ -226,7 +233,7 @@ class Assistant:
                     })
                 
                 response = self.client.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-4o-mini",
                     messages=messages,
                     max_tokens=500
                 )
