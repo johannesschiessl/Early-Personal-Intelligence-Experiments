@@ -1,1 +1,1 @@
-# Personal-Intelligence
+# AI-Bot
